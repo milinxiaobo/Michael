@@ -1,8 +1,8 @@
 package logger
 
 import (
-	"io"
 	"log"
+	"os"
 )
 
 var (
@@ -17,9 +17,17 @@ var (
 )
 
 // InitLogger blabla
-func InitLogger(traceHandle io.Writer, infoHandle io.Writer, warningHandle io.Writer, errorHandle io.Writer) {
-	Trace = log.New(traceHandle, "TRACE: ", log.Ldate|log.Ltime|log.Lshortfile)
-	Info = log.New(infoHandle, "INFO: ", log.Ldate|log.Ltime|log.Lshortfile)
-	Warning = log.New(warningHandle, "WARNING: ", log.Ldate|log.Ltime|log.Lshortfile)
-	Error = log.New(errorHandle, "ERROR: ", log.Ldate|log.Ltime|log.Lshortfile)
+func InitLogger() {
+	fTrace, err := os.OpenFile("pcapagent_trace.log", os.O_CREATE|os.O_APPEND|os.O_RDWR, os.ModePerm|os.ModeTemporary)
+	if err != nil {
+		panic(err)
+	}
+	fInfo, err := os.OpenFile("pcapagent_info.log", os.O_CREATE|os.O_APPEND|os.O_RDWR, os.ModePerm|os.ModeTemporary)
+	if err != nil {
+		panic(err)
+	}
+	Trace = log.New(fTrace, "TRACE: ", log.Ldate|log.Ltime|log.Lshortfile)
+	Info = log.New(fInfo, "INFO: ", log.Ldate|log.Ltime|log.Lshortfile)
+	Warning = log.New(fTrace, "WARNING: ", log.Ldate|log.Ltime|log.Lshortfile)
+	Error = log.New(fTrace, "ERROR: ", log.Ldate|log.Ltime|log.Lshortfile)
 }

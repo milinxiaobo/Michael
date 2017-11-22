@@ -147,10 +147,14 @@ func (r *MySQLResponse) parseEOFPacket() error {
 }
 
 func (r *MySQLResponse) parseResultSet() error {
-	count, _ := r._parseColumnCountPacket()
+	count, err := r._parseColumnCountPacket()
+	if err != nil {
+		return errPacketNotParse
+	}
 	for i := uint64(0); i < count; i++ {
 		r._parseColumnDefinitionPacket()
 	}
+	r._parseTextResultsetRow(count)
 	return errPacketParsed
 }
 
@@ -159,6 +163,9 @@ func (r *MySQLResponse) _parseColumnCountPacket() (uint64, error) {
 	pktLen, c := parseInt3(d, c)
 	pktSeq, c := parseInt1(d, c)
 	logger.Trace.Printf("_parseColumnCountPacket~Data:% x,Cursor:%d,pktLen:%d,pktSeq:%d\n", d, c, pktLen, pktSeq)
+	if pktLen != 0 {
+		return 0, errPacketNotParse
+	}
 	count, c := parseIntLenenc(d, c)
 	logger.Info.Printf("_parseColumnCountPacket~count:%d\n", count)
 	r.Data = r.Data[r.Cursor+4+uint64(pktLen):]
@@ -182,18 +189,21 @@ func (r *MySQLResponse) _parseColumnDefinitionPacket() error {
 	maxColumnSize, c := parseInt4(d, c)
 	fieldTypes, c := parseInt1(d, c)
 	if _, ok := resultSetFieldTypes[fieldTypes]; !ok {
+		logger.Trace.Printf("fieldTypes not found: %d\n", fieldTypes)
 		return errPacketNotParse
 	}
 	fieldDetailFlag, c := parseInt2(d, c)
 	if _, ok := resultSetFieldDetailFlag[fieldDetailFlag]; !ok {
-		return errPacketNotParse
+		logger.Trace.Printf("fieldDetailFlag not found: %d\n", fieldDetailFlag)
+		// TODO: why not parse
+		// return errPacketNotParse
 	}
 	decimals, c := parseInt1(d, c)
 	unused, c := parseInt2(d, c)
 	logger.Info.Printf("_parseColumnDefinitionPacket~catalog:%s,schema:%s,tableAlias:%s,table:%s,columnAlias:%s,column:%s\n",
 		catalog, schema, tableAlias, table, columnAlias, column)
-	logger.Info.Printf(`_parseColumnDefinitionPacket~
-		lengthOfFixedFields:%d,characterSetNumber:%d,maxColumnSize:%d,fieldTypes:%s,fieldDetailFlag:%s,decimals:%d,unused:%d\n`,
+	logger.Info.Printf("_parseColumnDefinitionPacket~lengthOfFixedFields:%d,characterSetNumber:%d,maxColumnSize:%d,"+
+		"fieldTypes:%s,fieldDetailFlag:%s,decimals:%d,unused:%d\n",
 		lengthOfFixedFields, characterSetNumber, maxColumnSize, resultSetFieldTypes[fieldTypes], resultSetFieldDetailFlag[fieldDetailFlag],
 		decimals, unused)
 	r.Data = r.Data[r.Cursor+4+uint64(pktLen):]
@@ -201,61 +211,22 @@ func (r *MySQLResponse) _parseColumnDefinitionPacket() error {
 	return nil
 }
 
-func (r *MySQLResponse) _parseTextResultsetRow() error {
+func (r *MySQLResponse) _parseTextResultsetRow(count uint64) error {
 	r.parseEOFPacket()
-	/*
-		1 0 0 1 2
-		47 0 0 2
-			3 100 101 102
-			9 108 105 110 120 105 97 111 98 111
-			4 116 101 115 116
-			4 116 101 115 116
-			4 110 97 109 101
-			4 110 97 109 101
-			12
-			63 0
-			11 0 0 0
-			3
-			0 0
-			0
-			0 0
-		47 0 0 3
-			3 100 101 102
-			9 108 105 110 120 105 97 111 98 111
-			4 116 101 115 116
-			4 116 101 115 116
-			4 114 111 108 101
-			4 114 111 108 101
-			12
-			63 0
-			11 0 0 0
-			3
-			0 0
-			0
-			0 0
-		5 0 0 4 254 0 0 34 0
-		4 0 0 5 1 48 1 48
-		4 0 0 6 1 50 1 50
-		4 0 0 7 1 51 1 51
-		4 0 0 8 1 50 1 50
-		4 0 0 9 1 51 1 51
-		4 0 0 10 1 49 1 49
-		4 0 0 11 1 49 1 49
-		4 0 0 12 1 49 1 49
-		4 0 0 13 1 49 1 49
-		4 0 0 14 1 49 1 49
-		4 0 0 15 1 49 1 49
-		4 0 0 16 1 49 1 49
-		4 0 0 17 1 49 1 49
-		4 0 0 18 1 49 1 49
-		4 0 0 19 1 49 1 49
-		4 0 0 20 1 49 1 49
-		4 0 0 21 1 49 1 49
-		4 0 0 22 1 49 1 49
-		4 0 0 23 1 49 1 49
-		4 0 0 24 1 49 1 49
-		5 0 0 25 254 0 0 34 0
-	*/
+	for {
+		if r.isEOFPacket() {
+			r.parseEOFPacket()
+			break
+		}
+		d, c := r.Data, r.Cursor
+		_, c = parseInt3(d, c)
+		_, c = parseInt1(d, c)
+		for i := uint64(0); i < count; i++ {
+			var tmp string
+			tmp, c = parseStringLenenc(d, c)
+			logger.Info.Printf("_parseTextResultsetRow~data:%s", tmp)
+		}
+	}
 	return nil
 }
 

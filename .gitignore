@@ -12,10 +12,13 @@
 
 # Project-local glide cache, RE: https://github.com/Masterminds/glide/issues/736
 .glide/
+
 .vscode
-bin
-pkg
-github.com
-golang.org
-sourcegraph.com
-sqlparser
+/bin/
+/pkg/
+/src/github.com/
+/src/golang.org/
+/src/sourcegraph.com/
+/src/lib/sqlparser/
+pcapagent
+*.log
